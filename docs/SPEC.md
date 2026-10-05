@@ -47,8 +47,9 @@
 ## 4. Règles
 
 - **Repas dehors** : `ext = { place: 'cantine' | 'resto', photos: [id], items: [{ id, label, emoji, kcal, p, dishId?, size?, photo? }], estimate? }`.
-  Calories = somme des plats ; tant qu'aucun plat n'est indiqué, `estimate` (650 kcal pour un déjeuner
-  de cantine prévu par les suggestions) est compté. Jamais dans les courses ni les restes. Portion
+  Les photos servent d'aide-mémoire ; les plats sont indiqués plus tard. Calories = somme des plats ; tant
+  qu'aucun plat n'est indiqué, l'estimation du lieu est comptée (650 kcal cantine, 900 kcal restaurant).
+  Bouton 📷 : repas deviné d'après l'heure (avant 11 h petit-déj, 15 h déjeuner, 18 h goûter, puis dîner). Jamais dans les courses ni les restes. Portion
   petite / normale / grande = × 0,75 / 1 / 1,3. Les photos d'un repas retiré sont effacées après le délai d'annulation.
 - **Objectif de calories** : Mifflin-St Jeor (`10 × poids + 6,25 × taille − 5 × âge − 161` pour une
   femme, `+ 5` pour un homme) × activité (1,2 sans sport … 1,725), moins 0, 300 ou 500 kcal selon le but,

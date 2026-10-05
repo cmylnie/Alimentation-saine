@@ -1,6 +1,6 @@
 // Service worker : l'appli s'ouvre même sans réseau.
 // « Réseau d'abord » : dès qu'il y a du réseau, on récupère la dernière version, sinon la copie en cache.
-const CACHE = 'mon-assiette-v2';
+const CACHE = 'mon-assiette-v3';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/app.js', 'js/model.js', 'js/actions.js', 'js/store.js', 'js/dates.js',

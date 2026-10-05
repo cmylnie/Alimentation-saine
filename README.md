@@ -27,16 +27,17 @@ et de chaque journée, je compose mes propres assiettes, et la liste de courses 
 | Créer mon assiette | **Composer** : ingrédient par ingrédient, les calories se calculent toutes seules |
 | Adapter une recette existante | Recette → *Adapter* (une copie modifiable est créée) |
 | Faire les courses | **Courses** : tout est regroupé par rayon, sans doublon, quantités arrondies au-dessus |
-| Noter un repas à la cantine | Bouton **+** du déjeuner → *Cantine* → photo du plateau, puis ce qu'il contient |
-| Noter un repas au restaurant | Bouton **+** → *Restaurant* → une photo par plat, puis le plat et la taille de la portion |
+| Garder en photo un repas pris dehors | Bouton **📷** de la semaine → *À la cantine* ou *Au restaurant* (repas deviné d'après l'heure ; les photos suivantes du même repas s'y ajoutent) |
+| Renseigner plus tard ce que j'ai mangé dehors | Bandeau *à renseigner* ou toucher le repas → *Indiquer…* : les photos restent affichées pour t'aider |
 | Prévoir mes jours de cantine | *Me proposer des menus* → jours de cantine (compté ≈ 650 kcal jusqu'à la photo) |
 | Calculer mon objectif de calories | ⚙ Réglages → âge, taille, poids, activité, but |
 
 Les quantités de féculents sont données **crues** (le poids cuit est indiqué à côté : 50 g de quinoa
 cru ≈ 150 g cuit). Les valeurs nutritionnelles sont indicatives.
 
-Les photos de repas restent sur le téléphone. L'appli ne reconnaît pas le contenu d'une photo : on indique
-les plats parmi une liste de plats courants (taille de portion au choix) ou on saisit les calories.
+Les photos de repas servent d'aide-mémoire et restent sur le téléphone. Les plats s'indiquent quand on veut,
+parmi une liste de plats courants (taille de portion au choix) ou en saisissant les calories ; en attendant,
+le repas compte ≈ 650 kcal (cantine) ou ≈ 900 kcal (restaurant).
 Les photos ne sont pas dans la sauvegarde.
 
 ## Développement

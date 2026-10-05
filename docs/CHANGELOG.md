@@ -1,5 +1,13 @@
 # Journal des versions
 
+## 1.2.0 — 5 octobre 2026
+
+- La photo d'un repas pris dehors sert d'aide-mémoire : on la prend sur le moment, on indique les plats
+  plus tard en la regardant. En attendant, le repas compte ≈ 650 kcal (cantine) ou ≈ 900 kcal (restaurant).
+- Bouton 📷 sur la semaine : photo d'abord, puis « cantine » ou « restaurant » ; le repas est deviné
+  d'après l'heure et les photos suivantes du même repas s'y ajoutent.
+- Bandeau « repas pris dehors à renseigner » sur la semaine.
+
 ## 1.1.0 — 5 octobre 2026
 
 - Poissons : plus de sardines ni de maquereau ; arrivée de la bonite et de l'églefin (4 nouvelles recettes).

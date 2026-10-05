@@ -163,11 +163,15 @@ test('cantine : jours réservés, estimation puis plats réels, rien dans les co
 test('restaurant : plusieurs plats, chacun avec sa photo', () => {
   const s = emptyState();
   const e = A.addExtEntry(s, { date: MONDAY, slot: 'diner', place: 'resto' }, ids);
-  assert.equal(M.extNutrition(e).kcal, 0);
+  assert.equal(M.extNutrition(e).kcal, 900, 'estimation tant que les plats ne sont pas indiqués');
+  assert.ok(M.extToFill(e));
+  assert.deepEqual(M.toFill(s, MONDAY).map(x => x.id), [e.id]);
   A.addExtItem(s, e.id, { ...M.dishItem('salade-composee', 'petite'), photo: 'a' }, ids);
   A.addExtItem(s, e.id, { ...M.dishItem('saumon'), photo: 'b' }, ids);
   assert.equal(M.extNutrition(e).kcal, 240 + 320);
   assert.deepEqual(A.photosOf(e), ['a', 'b']);
+  assert.ok(!M.extToFill(e));
+  assert.equal(M.toFill(s, MONDAY).length, 0);
   assert.throws(() => A.addExtItem(s, e.id, { label: '', kcal: 10 }, ids));
 });
 

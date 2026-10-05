@@ -118,7 +118,8 @@ export const weekEntries = (state, monday) => {
 /* ---------------- Repas pris dehors (cantine, restaurant) ---------------- */
 
 // Un repas dehors : { ext: { place: 'cantine' | 'resto', photos: [id], items: [{ id, label, emoji, kcal, p, photo? }], estimate? } }
-// Tant qu'aucun plat n'est indiqué, l'estimation (repas prévu à la cantine) est comptée.
+// La photo sert d'aide-mémoire : les plats sont indiqués plus tard. En attendant, une estimation est
+// comptée (650 kcal à la cantine, 900 au restaurant).
 export const PLACES = {
   cantine: { name: 'Cantine', emoji: '🏢', estimate: 650 },
   resto: { name: 'Restaurant', emoji: '🍴', estimate: 900 },
@@ -132,9 +133,15 @@ export function dishItem(dishId, sizeId = 'normale') {
   return { dishId, size: sz.id, label: d.name + (sz.k !== 1 ? ` (${sz.name.toLowerCase()} portion)` : ''), emoji: d.emoji, kcal: Math.round(d.kcal * sz.k), p: Math.round(d.p * sz.k) };
 }
 
+// Repas photographié mais pas encore renseigné.
+export const extToFill = e => !!(e.ext && !e.ext.items.length);
+
 export function extNutrition(e) {
   const items = (e.ext && e.ext.items) || [];
-  if (!items.length) return { kcal: e.ext.estimate || 0, p: 0, c: 0, f: 0, estimated: !!e.ext.estimate };
+  if (!items.length) {
+    const est = e.ext.estimate ?? (PLACES[e.ext.place] || {}).estimate ?? 0;
+    return { kcal: est, p: 0, c: 0, f: 0, estimated: est > 0 };
+  }
   return { kcal: items.reduce((s, i) => s + (i.kcal || 0), 0), p: items.reduce((s, i) => s + (i.p || 0), 0), c: 0, f: 0, estimated: false };
 }
 
@@ -154,6 +161,9 @@ export function dayTotals(state, date) {
   }
   return t;
 }
+
+export const toFill = (state, monday) => weekEntries(state, monday).filter(extToFill)
+  .sort((a, b) => a.date.localeCompare(b.date) || SLOTS.findIndex(s => s.id === a.slot) - SLOTS.findIndex(s => s.id === b.slot));
 
 export function weekSummary(state, monday) {
   const days = weekDays(monday).map(d => ({ date: d, ...dayTotals(state, d) }));

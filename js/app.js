@@ -6,7 +6,7 @@ import { DISHES, DISH_CATS, SIZES } from './data/dishes.js';
 import * as P from './photos.js';
 import { todayISO, addDays, mondayOf, weekDays, labelDay, labelDayShort, labelWeek, JOURS_COURT } from './dates.js';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 
 let state = S.load();
 let view = 'semaine';
@@ -99,6 +99,7 @@ function render() {
   $('#todayLabel').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   $('#pageTitle').textContent = TITLES[view];
   document.querySelectorAll('#tabbar .tab').forEach(b => b.classList.toggle('on', b.dataset.tab === view));
+  $('#fab').classList.toggle('hide', view !== 'semaine');
   const html = { semaine: viewSemaine, recettes: viewRecettes, composer: viewComposer, courses: viewCourses, reglages: viewReglages }[view]();
   $('#view').innerHTML = html;
   const mount = { recettes: mountRecettes, composer: mountComposer, courses: mountCourses, reglages: mountReglages }[view];
@@ -172,6 +173,10 @@ function viewSemaine() {
     <button class="btn btn-primary" data-act="suggest">✨ ${entries.length ? 'Compléter la semaine' : 'Me proposer des menus'}</button>
     ${entries.length ? '<button class="btn btn-secondary" style="flex:0 0 auto;width:auto;padding:11px 14px" data-act="clearweek" aria-label="Vider la semaine">Vider</button>' : ''}
   </div>`;
+  const pending = M.toFill(state, week).filter(e => e.ext.photos.length || e.date < T());
+  if (pending.length) {
+    h += `<div class="banner warn"><span>📷 ${plural(pending.length, 'repas', 'repas')} pris dehors ${pending.length > 1 ? 'sont' : 'est'} à renseigner. La photo t'aide à te souvenir de ce que tu as mangé.</span><button class="btn btn-primary" data-act="entry" data-id="${pending[0].id}">Renseigner</button></div>`;
+  }
   if (entries.length) {
     const cooked = entries.filter(e => !e.leftoverOf && !e.ext && (M.recipe(state, e.recipeId) || {}).type !== 'accomp').length;
     h += `<div class="kpis">
@@ -211,7 +216,7 @@ function extRow(e) {
   const pl = M.PLACES[e.ext.place];
   const n = M.extNutrition(e);
   const photos = A.photosOf(e);
-  const sub = e.ext.items.length ? e.ext.items.map(i => i.label).join(', ') : '📷 À compléter : prends ton repas en photo';
+  const sub = e.ext.items.length ? e.ext.items.map(i => i.label).join(', ') : photos.length ? '✎ À renseigner (estimation en attendant)' : '📷 Prends ton repas en photo pour t\'en souvenir';
   return `<div class="meal ${e.done ? 'done' : ''}" data-act="entry" data-id="${e.id}">
     <button class="tick ${e.done ? 'on' : ''}" data-act="done" data-id="${e.id}" aria-label="${e.done ? 'Pas encore mangé' : "C'est mangé"}">✓</button>
     ${photos.length ? `<img class="thumb" data-photo="${photos[0]}" alt="">` : `<span class="em">${pl.emoji}</span>`}
@@ -402,11 +407,9 @@ function bindPhotoInputs(root) {
     };
   });
 }
+// La photo sert d'aide-mémoire : on la garde, les plats seront indiqués plus tard.
 const PHOTO_ACTIONS = {
-  // photo de tout le plateau : on demande ensuite ce qu'il contient
-  plateau: (id, pid) => { A.addExtPhoto(state, id, pid); commit(); dishPicker(id, null, true); },
-  // photo d'un plat : on demande quel plat c'est
-  plat: (id, pid) => { dishPicker(id, pid); },
+  photo: (id, pid) => { A.addExtPhoto(state, id, pid); commit(); extSheet(id); toast('Photo gardée. Tu indiqueras les plats quand tu veux.'); },
 };
 
 function extSheet(id) {
@@ -418,7 +421,7 @@ function extSheet(id) {
   let h = `<div class="r-head"><span class="em">${pl.emoji}</span><div><h2>${pl.name}</h2>
     <p class="s">${esc(slotById(e.slot).name)} · ${esc(labelDay(e.date))}</p></div></div>
     <div class="macros" style="grid-template-columns:1fr 1fr"><div><b>${n.estimated ? '≈ ' : ''}${n.kcal}</b><span>kcal</span></div><div><b>${n.estimated ? '–' : n.p + ' g'}</b><span>Prot.</span></div></div>`;
-  if (n.estimated) h += `<p class="small muted" style="margin:-6px 0 12px">Estimation en attendant : ${cantine ? 'prends ton plateau en photo' : 'prends chaque plat en photo'} et indique ce que c'est.</p>`;
+  if (n.estimated) h += `<p class="small muted" style="margin:-6px 0 12px">${e.ext.photos.length ? 'Estimation en attendant que tu indiques ce que tu as mangé.' : `Estimation en attendant. Prends ${cantine ? 'ton plateau' : 'tes plats'} en photo pour t'en souvenir, et indique ce que tu as mangé quand tu as le temps.`}</p>`;
   if (e.ext.photos.length) {
     h += `<div class="photos">${e.ext.photos.map(p => `<div class="ph"><img data-photo="${p}" alt="Photo du repas" data-act="viewphoto" data-id="${p}"><button class="x" data-act="delphoto" data-id="${id}|${p}" aria-label="Supprimer la photo">×</button></div>`).join('')}</div>`;
   }
@@ -428,8 +431,9 @@ function extSheet(id) {
       <div class="n">${esc(it.label)}<small>${it.kcal} kcal${it.p ? ` · ${it.p} g de protéines` : ''}</small></div>
       <button class="x" data-act="delitem" data-id="${id}|${it.id}" aria-label="Retirer">×</button></div>`).join('') : '<p class="empty">Rien pour l\'instant.</p>'}</div>
     <div class="stack">
-      ${cantine ? photoInput('plateau', id, '📷 Photo du plateau', !e.ext.items.length) : photoInput('plat', id, '📷 Photo d\'un plat', true)}
-      <button class="btn btn-secondary" data-act="adddish" data-id="${id}">+ Ajouter ${cantine ? 'un élément' : 'un plat'} sans photo</button>
+      ${e.ext.photos.length || e.ext.items.length
+        ? `<button class="btn btn-primary" data-act="adddish" data-id="${id}">+ Indiquer ${cantine ? 'ce qu\'il y avait sur le plateau' : 'un plat'}</button>${photoInput('photo', id, cantine ? '📷 Autre photo' : '📷 Photo d\'un autre plat')}`
+        : `${photoInput('photo', id, cantine ? '📷 Photo du plateau' : '📷 Photo d\'un plat', true)}<button class="btn btn-secondary" data-act="adddish" data-id="${id}">+ Indiquer ce que j'ai mangé</button>`}
     </div>
     <div class="actions-grid" style="margin-top:14px">
       <button class="btn btn-primary wide" data-act="done" data-id="${id}">${e.done ? 'Finalement, pas encore mangé' : "✓ C'est mangé"}</button>
@@ -439,7 +443,13 @@ function extSheet(id) {
   openSheet(h, root => { bindPhotoInputs(root); showPhotos(root); });
 }
 
-ACTIONS.adddish = id => dishPicker(id, null);
+ACTIONS.adddish = id => dishPicker(id);
+// Photo en grand pendant qu'on renseigne le repas.
+ACTIONS.zoomphoto = v => {
+  const [id, pid] = v.split('|');
+  openSheet(`<img class="photo-full" data-photo="${pid}" alt="Photo du repas"><button class="btn btn-primary" style="margin-top:12px" data-act="unzoom" data-id="${id}">Retour</button>`, root => showPhotos(root));
+};
+ACTIONS.unzoom = id => dishPicker(id);
 ACTIONS.delitem = v => {
   const [id, itemId] = v.split('|');
   const pid = A.removeExtItem(state, id, itemId);
@@ -460,7 +470,7 @@ ACTIONS.viewphoto = pid => {
 let sheetReturn = null;
 
 // Choix d'un plat courant (cantine, restaurant) avec la taille de la portion.
-function dishPicker(id, photoId, plateau = false) {
+function dishPicker(id) {
   let cat = 'plat';
   let q = '';
   sheetReturn = () => extSheet(id);
@@ -472,28 +482,31 @@ function dishPicker(id, photoId, plateau = false) {
     root.querySelectorAll('[data-dcat]').forEach(b => b.classList.toggle('on', !words.length && b.dataset.dcat === cat));
   };
   const e = state.plan.find(x => x.id === id);
-  const intro = photoId ? 'Quel est ce plat ?' : plateau ? 'Ajoute un par un ce qu\'il y a sur ton plateau : entrée, plat, accompagnement, dessert, pain…' : 'Choisis le plat et la taille de la portion.';
-  openSheet(`<h2>${e.ext.place === 'cantine' ? 'Sur mon plateau' : 'Plat commandé'}</h2>
-    ${photoId ? `<img class="photo-full small" data-photo="${photoId}" alt="">` : ''}
+  const intro = e.ext.place === 'cantine' ? 'Ajoute un par un ce qu\'il y avait sur ton plateau : entrée, plat, accompagnement, dessert, pain…' : 'Ajoute chaque plat avec la taille de la portion.';
+  const reminder = e.ext.photos.length ? `<div class="photo-strip">${e.ext.photos.map(p => `<img data-photo="${p}" data-act="zoomphoto" data-id="${id}|${p}" alt="Photo du repas">`).join('')}</div>` : '';
+  const added = e.ext.items.length ? `<p class="small" style="margin:0 0 10px"><b>Déjà indiqué :</b> ${esc(e.ext.items.map(i => i.label).join(', '))} · ${M.extNutrition(e).kcal} kcal</p>` : '';
+  openSheet(`<h2>${e.ext.place === 'cantine' ? 'Sur mon plateau' : 'Plats commandés'}</h2>
+    ${reminder}${added}
     <p class="intro">${intro}</p>
     <div class="search" style="padding:0"><input type="search" placeholder="Chercher (poisson, frites, tarte…)" autocomplete="off"></div>
     <div class="chips scroll" style="padding:10px 0 4px">${DISH_CATS.map(c => `<button class="chip" data-dcat="${c.id}">${c.name}</button>`).join('')}</div>
     <div class="pick-list"></div>
-    <div class="btn-row"><button class="btn btn-secondary" data-act="dishback">${plateau ? "J'ai fini" : 'Retour'}</button><button class="btn btn-secondary" data-act="otherdish">Autre plat</button></div>`, root => {
+    <div class="btn-row"><button class="btn btn-primary" data-act="dishback">J'ai fini</button><button class="btn btn-secondary" data-act="otherdish">Autre plat</button></div>`, root => {
     root.querySelector('input').oninput = ev => { q = ev.target.value; draw(root); };
     root.querySelectorAll('[data-dcat]').forEach(b => { b.onclick = () => { cat = b.dataset.dcat; q = ''; root.querySelector('input').value = ''; draw(root); }; });
     draw(root);
     showPhotos(root);
   });
-  ACTIONS.dishback = () => { if (photoId) purgePhotosLater([photoId]); extSheet(id); };
+  ACTIONS.dishback = () => extSheet(id);
   ACTIONS.pickdish = did => {
     const d = M.dish(did);
     openSheet(`<h2>${d.emoji} ${esc(d.name)}</h2><p class="intro">Quelle taille de portion ?</p>
       <div class="stack">${SIZES.map(sz => `<button class="btn btn-secondary" data-act="picksize" data-id="${sz.id}">${sz.name} · ${Math.round(d.kcal * sz.k)} kcal</button>`).join('')}</div>`);
     ACTIONS.picksize = size => {
-      A.addExtItem(state, id, { ...M.dishItem(did, size), photo: photoId });
+      A.addExtItem(state, id, M.dishItem(did, size));
       commit();
-      if (plateau) { toast(`${d.name} ajouté.`); dishPicker(id, null, true); } else extSheet(id);
+      toast(`${d.name} ajouté.`);
+      dishPicker(id);
     };
   };
   ACTIONS.otherdish = () => {
@@ -502,19 +515,55 @@ function dishPicker(id, photoId, plateau = false) {
       <div class="field"><label>Plat</label><input name="label" required placeholder="Ex. : Gratin de poisson"></div>
       <div class="field"><label>Calories (kcal)</label><input name="kcal" inputmode="numeric" required></div>
       ${btnRow('Ajouter', 'Retour')}</form>`, root => {
-      root.querySelector('[data-cancel]').onclick = () => dishPicker(id, photoId, plateau);
+      root.querySelector('[data-cancel]').onclick = () => dishPicker(id);
       root.querySelector('form').addEventListener('submit', ev => {
         ev.preventDefault();
         const f = ev.target;
         const k = num(f.elements.kcal.value);
         if (!(k >= 0)) { f.querySelector('.error').textContent = 'Indique les calories.'; return; }
-        A.addExtItem(state, id, { label: f.elements.label.value.trim() || 'Plat', kcal: k, photo: photoId });
+        A.addExtItem(state, id, { label: f.elements.label.value.trim() || 'Plat', kcal: k });
         commit();
-        if (plateau) dishPicker(id, null, true); else extSheet(id);
+        dishPicker(id);
       });
     });
   };
 }
+
+// Bouton 📷 : photo d'abord, on range ensuite (le repas en cours est deviné d'après l'heure).
+function currentSlot(d = new Date()) {
+  const h = d.getHours();
+  return h < 11 ? 'petitdej' : h < 15 ? 'dejeuner' : h < 18 ? 'gouter' : 'diner';
+}
+$('#quickPhoto').onchange = async ev => {
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  const pid = 'ph-' + M.defaultId();
+  try { await P.savePhoto(file, pid); } catch (ex) { toast('Photo non enregistrée : la mémoire du téléphone est peut-être pleine.'); return; }
+  const date = T(), slot = currentSlot();
+  const existing = state.plan.find(e => e.ext && e.date === date && e.slot === slot);
+  const keep = (id, place) => {
+    const e = id ? state.plan.find(x => x.id === id) : A.addExtEntry(state, { date, slot, place });
+    A.addExtPhoto(state, e.id, pid);
+    week = mondayOf(date);
+    closeSheet(); commit();
+    toast(`Photo rangée : ${M.PLACES[e.ext.place].name.toLowerCase()}, ${slotById(slot).name.toLowerCase()}. Tu indiqueras les plats plus tard.`);
+  };
+  let saved = false;
+  openSheet(`<h2>Où manges-tu ?</h2>
+    <img class="photo-full small" data-photo="${pid}" alt="">
+    <p class="intro">${esc(slotById(slot).name)} d'aujourd'hui. Tu pourras le changer ensuite.</p>
+    <div class="stack">
+      ${existing ? `<button class="btn btn-primary" data-act="qp-add">Ajouter à mon repas : ${esc(M.PLACES[existing.ext.place].name)}</button>` : ''}
+      <button class="btn ${existing ? 'btn-secondary' : 'btn-primary'}" data-act="qp-place" data-id="cantine">🏢 À la cantine</button>
+      <button class="btn btn-secondary" data-act="qp-place" data-id="resto">🍴 Au restaurant</button>
+      <button class="btn btn-secondary" data-act="qp-cancel">Annuler</button>
+    </div>`, root => showPhotos(root));
+  ACTIONS['qp-add'] = () => { saved = true; keep(existing.id); };
+  ACTIONS['qp-place'] = place => { saved = true; keep(null, place); };
+  ACTIONS['qp-cancel'] = () => { closeSheet(); };
+  const watch = setInterval(() => { if (!sheetOpen) { clearInterval(watch); if (!saved) P.deletePhoto(pid); } }, 500);
+};
 
 // Choix d'un jour et d'un repas (pour déplacer, placer un reste, ajouter depuis une recette).
 function whenFields(date, slot) {
