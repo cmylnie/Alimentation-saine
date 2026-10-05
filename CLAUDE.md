@@ -3,6 +3,10 @@
 - Appli de menus en français (PWA statique, sans dépendance ni build), utilisée sur un téléphone Android (Chrome).
 - Lire `docs/SPEC.md` avant de modifier les calculs ou les données.
 - Régime de l'utilisatrice : **pas de viande** (poisson oui). Le test `aucune viande` doit toujours passer.
+- Poissons qu'elle n'aime pas : sardine, hareng, haddock, rouget, maquereau (testé). Elle aime : bonite, thon,
+  églefin, saumon, cabillaud.
+- Pas de sport en ce moment : l'objectif de calories se calcule dans Réglages (données saisies sur le téléphone,
+  jamais dans le code).
 - Un aliment = **un seul ingrédient** dans `js/data/ingredients.js` (jamais deux noms pour le même produit).
   Les recettes (`js/data/recipes.js`) n'utilisent que des identifiants de ce catalogue, dans son unité.
 - Calculs purs dans `js/model.js`, modifications d'état dans `js/actions.js`, interface dans `js/app.js`.

@@ -28,7 +28,7 @@ export function updateEntry(state, id, patch) {
   const e = state.plan.find(x => x.id === id);
   if (!e) return;
   Object.assign(e, patch);
-  if (!e.leftoverOf) e.portions = Math.max(e.table || 1, e.portions || 1);
+  if (!e.leftoverOf && !e.ext) e.portions = Math.max(e.table || 1, e.portions || 1);
 }
 
 export const toggleDone = (state, id) => { const e = state.plan.find(x => x.id === id); if (e) e.done = !e.done; };
@@ -106,3 +106,45 @@ export function uncheckAll(state, monday) {
   s.checked = [];
   for (const x of s.extras) x.done = false;
 }
+
+/* ---------- Repas pris dehors ---------- */
+
+export function addExtEntry(state, { date, slot, place }, newId = M.defaultId) {
+  const e = { id: newId(), date, slot, ext: { place, photos: [], items: [] } };
+  state.plan.push(e);
+  return e;
+}
+
+const extOf = (state, id) => {
+  const e = state.plan.find(x => x.id === id);
+  if (!e || !e.ext) throw new Error('Repas introuvable.');
+  return e.ext;
+};
+
+export function addExtItem(state, id, item, newId = M.defaultId) {
+  const ext = extOf(state, id);
+  if (!item.label || !(item.kcal >= 0)) throw new Error('Indique le plat et ses calories.');
+  const it = { id: newId(), label: item.label, emoji: item.emoji || '🍽️', kcal: Math.round(item.kcal), p: Math.round(item.p || 0) };
+  if (item.dishId) { it.dishId = item.dishId; it.size = item.size; }
+  if (item.photo) it.photo = item.photo;
+  ext.items.push(it);
+  delete ext.estimate;
+  return it;
+}
+
+// Renvoie l'identifiant de la photo liée, à effacer du téléphone.
+export function removeExtItem(state, id, itemId) {
+  const ext = extOf(state, id);
+  const it = ext.items.find(i => i.id === itemId);
+  ext.items = ext.items.filter(i => i.id !== itemId);
+  return it && it.photo ? it.photo : null;
+}
+
+export const addExtPhoto = (state, id, photoId) => { extOf(state, id).photos.push(photoId); };
+export function removeExtPhoto(state, id, photoId) {
+  const ext = extOf(state, id);
+  ext.photos = ext.photos.filter(p => p !== photoId);
+}
+
+// Toutes les photos rattachées à un repas (pour les effacer avec lui).
+export const photosOf = e => (e && e.ext ? [...e.ext.photos, ...e.ext.items.map(i => i.photo).filter(Boolean)] : []);

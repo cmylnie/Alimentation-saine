@@ -7,6 +7,8 @@
 | `index.html`, `css/app.css` | Coquille, mobile d'abord (≤ 560 px) |
 | `js/data/ingredients.js` | Catalogue unique des ingrédients : rayon, groupe, unité, valeurs pour 100 g |
 | `js/data/recipes.js` | Recettes de base (pescétariennes) |
+| `js/data/dishes.js` | Plats courants de cantine et de restaurant (kcal et protéines par portion normale) |
+| `js/photos.js` | Photos des repas dehors : réduites à 1 280 px (JPEG), rangées dans IndexedDB |
 | `js/dates.js` | Dates en chaînes locales `YYYY-MM-DD`, semaines du lundi au dimanche |
 | `js/model.js` | **Calculs purs** : nutrition, quantités, journées, liste de courses, recherche, suggestions |
 | `js/actions.js` | Modifications de l'état |
@@ -34,13 +36,23 @@
 | Clé | Contenu |
 |---|---|
 | `settings` | `kcalTarget`, `table` (personnes à table), `suggestSlots`, `batch` |
-| `plan` | `[{ id, date, slot, recipeId, portions, table, leftoverOf?, done? }]` |
+| `plan` | `[{ id, date, slot, recipeId, portions, table, leftoverOf?, done? }]`, ou repas dehors `{ id, date, slot, ext, done? }` |
+| `settings.profile` | `{ sex, age, height, weight, activity, goal }` saisis dans Réglages (sur le téléphone) |
+| `settings.cantineDays` | jours de cantine (0 = lundi) proposés par défaut |
 | `favorites`, `hidden` | identifiants de recettes |
 | `customRecipes`, `customIngredients` | créés dans l'appli (identifiants `u-…`, `ui-…`) |
 | `shopping[lundi]` | `{ checked: [idIngrédient], extras: [{ id, text, done }] }` |
 | `draft` | repas en cours de composition |
 
 ## 4. Règles
+
+- **Repas dehors** : `ext = { place: 'cantine' | 'resto', photos: [id], items: [{ id, label, emoji, kcal, p, dishId?, size?, photo? }], estimate? }`.
+  Calories = somme des plats ; tant qu'aucun plat n'est indiqué, `estimate` (650 kcal pour un déjeuner
+  de cantine prévu par les suggestions) est compté. Jamais dans les courses ni les restes. Portion
+  petite / normale / grande = × 0,75 / 1 / 1,3. Les photos d'un repas retiré sont effacées après le délai d'annulation.
+- **Objectif de calories** : Mifflin-St Jeor (`10 × poids + 6,25 × taille − 5 × âge − 161` pour une
+  femme, `+ 5` pour un homme) × activité (1,2 sans sport … 1,725), moins 0, 300 ou 500 kcal selon le but,
+  jamais sous `max(1 200 kcal femme / 1 500 homme, métabolisme de base)`, arrondi à 50.
 
 - **Calories d'une journée** : une portion par repas prévu (celle de l'utilisatrice), restes compris.
 - **Portions** : `portions` = cuisinées (courses) ; `table` = mangées au repas. Reste = `portions − table −

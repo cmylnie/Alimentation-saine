@@ -139,6 +139,53 @@ test('suggestion : complète les journées trop légères sans dépasser l\'obje
   assert.ok(!sans.plan.some(e => M.recipe(sans, e.recipeId).type === 'accomp'));
 });
 
+test('cantine : jours réservés, estimation puis plats réels, rien dans les courses', () => {
+  const s = emptyState();
+  A.applySuggestion(s, MONDAY, { slots: ['dejeuner', 'diner'], cantine: [0, 3] }, seeded(2), ids);
+  const lunch = s.plan.find(e => e.date === MONDAY && e.slot === 'dejeuner');
+  assert.equal(lunch.ext.place, 'cantine');
+  assert.ok(s.plan.find(e => e.date === '2026-10-08' && e.slot === 'dejeuner').ext);
+  assert.ok(!s.plan.find(e => e.date === '2026-10-06' && e.slot === 'dejeuner').ext);
+  const dinner = M.entryNutrition(s, s.plan.find(e => e.date === MONDAY && e.slot === 'diner')).kcal;
+  assert.equal(M.dayTotals(s, MONDAY).kcal, 650 + dinner);
+  A.addExtItem(s, lunch.id, M.dishItem('poisson-grille'), ids);
+  A.addExtItem(s, lunch.id, M.dishItem('feculent', 'grande'), ids);
+  A.addExtItem(s, lunch.id, { label: 'Tarte maison', kcal: 320, photo: 'ph-1' }, ids);
+  assert.equal(M.extNutrition(lunch).kcal, 160 + 286 + 320);
+  assert.equal(M.dayTotals(s, MONDAY).kcal, 766 + dinner);
+  assert.deepEqual(A.photosOf(lunch), ['ph-1']);
+  assert.equal(A.removeExtItem(s, lunch.id, lunch.ext.items[2].id), 'ph-1');
+  const all = M.shoppingList(s, MONDAY).flatMap(g => g.items);
+  assert.ok(all.length > 0);
+  assert.equal(M.leftoverLeft(s, lunch), 0);
+});
+
+test('restaurant : plusieurs plats, chacun avec sa photo', () => {
+  const s = emptyState();
+  const e = A.addExtEntry(s, { date: MONDAY, slot: 'diner', place: 'resto' }, ids);
+  assert.equal(M.extNutrition(e).kcal, 0);
+  A.addExtItem(s, e.id, { ...M.dishItem('salade-composee', 'petite'), photo: 'a' }, ids);
+  A.addExtItem(s, e.id, { ...M.dishItem('saumon'), photo: 'b' }, ids);
+  assert.equal(M.extNutrition(e).kcal, 240 + 320);
+  assert.deepEqual(A.photosOf(e), ['a', 'b']);
+  assert.throws(() => A.addExtItem(s, e.id, { label: '', kcal: 10 }, ids));
+});
+
+test('objectif de calories : activité réduite, plancher de sécurité', () => {
+  const base = { sex: 'f', age: 35, height: 165, weight: 65 };
+  const repos = M.estimateNeeds({ ...base, activity: 'repos' });
+  const sport = M.estimateNeeds({ ...base, activity: 'modere' });
+  assert.equal(repos.bmr, Math.round(650 + 1031.25 - 175 - 161));
+  assert.ok(repos.maintain < sport.maintain, 'sans sport, il faut moins de calories');
+  assert.equal(repos.target, repos.maintain);
+  const perdre = M.estimateNeeds({ ...base, activity: 'repos', goal: 'perdre' });
+  assert.ok(perdre.target < repos.target, 'perdre = moins que garder son poids');
+  assert.ok(perdre.target >= repos.bmr, 'jamais sous le métabolisme de base');
+  const petite = M.estimateNeeds({ sex: 'f', age: 60, height: 150, weight: 45, activity: 'repos', goal: 'perdre' });
+  assert.ok(petite.target >= 1200 && petite.floored);
+  assert.equal(M.estimateNeeds({ sex: 'f', age: 0, height: 165, weight: 65 }), null);
+});
+
 test('recherche : par ingrédient, sans accents', () => {
   const s = emptyState();
   const res = M.filterRecipes(s, { q: 'oeuf epinards' }).map(r => r.id);

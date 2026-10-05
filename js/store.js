@@ -7,12 +7,12 @@ export function emptyState() {
   return {
     app: APP_ID,
     version: SCHEMA_VERSION,
-    settings: { kcalTarget: 1800, table: 1, suggestSlots: ['petitdej', 'dejeuner', 'gouter', 'diner'], batch: false },
+    settings: { kcalTarget: 1600, table: 1, suggestSlots: ['petitdej', 'dejeuner', 'gouter', 'diner'], batch: false, cantineDays: [], profile: null },
     favorites: [],
     hidden: [],
     customRecipes: [],
     customIngredients: [],
-    plan: [],           // [{ id, date, slot, recipeId, portions, table, leftoverOf?, done? }]
+    plan: [],           // [{ id, date, slot, recipeId, portions, table, leftoverOf?, done? }] ou repas dehors { id, date, slot, ext }
     shopping: {},       // { lundi: { checked: [idIngrédient], extras: [{ id, text, done }] } }
     draft: null,        // repas en cours de composition
   };

@@ -64,8 +64,8 @@ export const INGREDIENTS = [
   I('crevettes', 'Crevettes cuites décortiquées', 'poisson', 'proteine', 'g', 1, 95, 21, 0, 1, { fam: 'poisson' }),
   I('fruits-de-mer', 'Mélange de fruits de mer', 'surgeles', 'proteine', 'g', 1, 80, 15, 2, 1.2, { fam: 'poisson' }),
   I('thon', 'Thon au naturel (boîte, égoutté)', 'conserves', 'proteine', 'g', 1, 115, 26, 0, 1, { fam: 'poisson', pack: { size: 100, label: 'boîte de 140 g' } }),
-  I('sardines', "Sardines à l'huile (égouttées)", 'conserves', 'proteine', 'g', 1, 210, 24, 0, 12, { fam: 'poisson', pack: { size: 90, label: 'boîte de 115 g' } }),
-  I('maquereau', 'Maquereau (boîte, au naturel)', 'conserves', 'proteine', 'g', 1, 190, 20, 0, 12, { fam: 'poisson', pack: { size: 125, label: 'boîte de 125 g' } }),
+  I('bonite', 'Bonite au naturel (boîte, égouttée)', 'conserves', 'proteine', 'g', 1, 110, 25, 0, 1, { fam: 'poisson', pack: { size: 100, label: 'boîte de 140 g' } }),
+  I('eglefin', "Filet d'églefin", 'poisson', 'proteine', 'g', 1, 80, 18.5, 0, 0.6, { fam: 'poisson' }),
   // Laitages et fromages
   I('skyr', 'Skyr nature', 'frais', 'laitier', 'g', 1, 60, 10.5, 4, 0.2, { fam: 'laitier' }),
   I('fromage-blanc', 'Fromage blanc nature', 'frais', 'laitier', 'g', 1, 75, 7.5, 4, 3, { fam: 'laitier' }),

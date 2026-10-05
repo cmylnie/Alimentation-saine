@@ -1,5 +1,14 @@
 # Journal des versions
 
+## 1.1.0 — 5 octobre 2026
+
+- Poissons : plus de sardines ni de maquereau ; arrivée de la bonite et de l'églefin (4 nouvelles recettes).
+- Cantine et restaurant : photo du plateau ou de chaque plat, choix parmi 46 plats courants avec la
+  taille de la portion (ou calories saisies), total du repas compté dans la journée.
+- Jours de cantine dans « Me proposer des menus » (déjeuner estimé à 650 kcal en attendant la photo).
+- Calcul de l'objectif de calories selon l'âge, la taille, le poids, l'activité du moment et le but.
+  Objectif par défaut ramené à 1 600 kcal.
+
 ## 1.0.0 — 5 octobre 2026
 
 Première version.

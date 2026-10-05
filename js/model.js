@@ -1,6 +1,7 @@
 // Calculs purs : nutrition, quantités, semaine, liste de courses, suggestions. Aucun accès au DOM.
 import { INGREDIENTS, UNITS, AISLES } from './data/ingredients.js';
 import { RECIPES } from './data/recipes.js';
+import { DISHES, SIZES } from './data/dishes.js';
 import { weekDays } from './dates.js';
 
 export const SLOTS = [
@@ -114,8 +115,32 @@ export const weekEntries = (state, monday) => {
   return state.plan.filter(e => days.has(e.date));
 };
 
+/* ---------------- Repas pris dehors (cantine, restaurant) ---------------- */
+
+// Un repas dehors : { ext: { place: 'cantine' | 'resto', photos: [id], items: [{ id, label, emoji, kcal, p, photo? }], estimate? } }
+// Tant qu'aucun plat n'est indiqué, l'estimation (repas prévu à la cantine) est comptée.
+export const PLACES = {
+  cantine: { name: 'Cantine', emoji: '🏢', estimate: 650 },
+  resto: { name: 'Restaurant', emoji: '🍴', estimate: 900 },
+};
+
+export const dish = id => DISHES.find(d => d.id === id) || null;
+
+export function dishItem(dishId, sizeId = 'normale') {
+  const d = dish(dishId);
+  const sz = SIZES.find(x => x.id === sizeId) || SIZES[1];
+  return { dishId, size: sz.id, label: d.name + (sz.k !== 1 ? ` (${sz.name.toLowerCase()} portion)` : ''), emoji: d.emoji, kcal: Math.round(d.kcal * sz.k), p: Math.round(d.p * sz.k) };
+}
+
+export function extNutrition(e) {
+  const items = (e.ext && e.ext.items) || [];
+  if (!items.length) return { kcal: e.ext.estimate || 0, p: 0, c: 0, f: 0, estimated: !!e.ext.estimate };
+  return { kcal: items.reduce((s, i) => s + (i.kcal || 0), 0), p: items.reduce((s, i) => s + (i.p || 0), 0), c: 0, f: 0, estimated: false };
+}
+
 // Ce que je mange, moi : une portion par repas prévu (les autres personnes à table ne comptent pas).
 export function entryNutrition(state, e) {
+  if (e.ext) return extNutrition(e);
   const r = recipe(state, e.recipeId);
   return r ? nutrition(state, r) : { kcal: 0, p: 0, c: 0, f: 0 };
 }
@@ -146,7 +171,7 @@ export function weekSummary(state, monday) {
 
 // Portions cuisinées qui restent pour un autre repas.
 export function leftoverLeft(state, e) {
-  if (e.leftoverOf) return 0;
+  if (e.leftoverOf || e.ext) return 0;
   const used = state.plan.filter(x => x.leftoverOf === e.id).reduce((s, x) => s + (x.table || 1), 0);
   return Math.max(0, (e.portions || 1) - (e.table || 1) - used);
 }
@@ -179,7 +204,7 @@ export function shoppingList(state, monday) {
   const totals = new Map();
   const uses = new Map();
   for (const e of weekEntries(state, monday)) {
-    if (e.leftoverOf) continue;
+    if (e.leftoverOf || e.ext) continue;
     const r = recipe(state, e.recipeId);
     if (!r) continue;
     for (const [id, qty] of scaled(r, e.portions || 1)) {
@@ -237,7 +262,7 @@ export function filterRecipes(state, { q = '', type = '', fam = '', quick = fals
 const SIDE_FRUITS = ['pomme', 'kiwis', 'poire', 'orange', 'compote', 'banane', 'fraises'];
 const SIDE_DAIRY = ['yaourt-nature', 'fromage-blanc-nature', 'petits-suisses'];
 
-export function suggestWeek(state, monday, { slots = ['petitdej', 'dejeuner', 'gouter', 'diner'], batch = false, table = 1, target = 0 } = {}, rng = Math.random, newId = defaultId) {
+export function suggestWeek(state, monday, { slots = ['petitdej', 'dejeuner', 'gouter', 'diner'], batch = false, table = 1, target = 0, cantine = [] } = {}, rng = Math.random, newId = defaultId) {
   const added = [];
   const plan = () => [...state.plan, ...added];
   const used = new Set(weekEntries(state, monday).map(e => e.recipeId));
@@ -253,6 +278,11 @@ export function suggestWeek(state, monday, { slots = ['petitdej', 'dejeuner', 'g
           if (r && r.type === 'repas') recent.push(mainFamily(state, r));
         }
         if (slot.id === 'dejeuner') pendingLeftover = null;
+        continue;
+      }
+      if (slot.id === 'dejeuner' && cantine.includes(dayIndex)) {
+        // le reste éventuel du dîner attend le prochain déjeuner à la maison
+        added.push({ id: newId(), date, slot: 'dejeuner', ext: { place: 'cantine', photos: [], items: [], estimate: PLACES.cantine.estimate } });
         continue;
       }
       if (!slots.includes(slot.id)) continue;
@@ -276,7 +306,7 @@ export function suggestWeek(state, monday, { slots = ['petitdej', 'dejeuner', 'g
     }
     if (target && added.length > before) {
       const mine = added.slice(before);
-      const filled = new Set(mine.map(e => e.slot));
+      const filled = new Set(mine.filter(e => !e.ext).map(e => e.slot));
       let total = plan().filter(e => e.date === date).reduce((s, e) => s + entryNutrition(state, e).kcal, 0);
       const sides = [
         ['dejeuner', SIDE_FRUITS[dayIndex % SIDE_FRUITS.length]],
@@ -320,4 +350,33 @@ let counter = 0;
 export function defaultId() {
   counter = (counter + 1) % 1e6;
   return Date.now().toString(36) + counter.toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+/* ---------------- Besoins en calories ---------------- */
+
+export const ACTIVITY = [
+  { id: 'repos', name: 'Pas de sport en ce moment', k: 1.2 },
+  { id: 'leger', name: 'Un peu active (marche)', k: 1.375 },
+  { id: 'modere', name: 'Sport 2 à 3 fois / semaine', k: 1.55 },
+  { id: 'sportive', name: 'Sport 4 fois / semaine ou +', k: 1.725 },
+];
+
+export const GOALS = [
+  { id: 'maintenir', name: 'Garder mon poids', delta: 0 },
+  { id: 'doucement', name: 'Perdre doucement (≈ 1 kg / mois)', delta: -300 },
+  { id: 'perdre', name: 'Perdre un peu plus (≈ 2 kg / mois)', delta: -500 },
+];
+
+// Formule de Mifflin-St Jeor. Plancher de sécurité : 1 200 kcal (femme) / 1 500 kcal (homme),
+// et jamais en dessous du métabolisme de base.
+export function estimateNeeds({ sex = 'f', age, height, weight, activity = 'repos', goal = 'maintenir' }) {
+  if (!(age > 0 && height > 0 && weight > 0)) return null;
+  const bmr = 10 * weight + 6.25 * height - 5 * age + (sex === 'h' ? 5 : -161);
+  const act = (ACTIVITY.find(a => a.id === activity) || ACTIVITY[0]).k;
+  const maintain = bmr * act;
+  const g = GOALS.find(x => x.id === goal) || GOALS[0];
+  const floor = Math.max(sex === 'h' ? 1500 : 1200, bmr);
+  const raw = maintain + g.delta;
+  const target = Math.round(Math.max(raw, floor) / 50) * 50;
+  return { bmr: Math.round(bmr), maintain: Math.round(maintain / 50) * 50, target, floored: raw < floor, protein: Math.round(weight * 1) };
 }

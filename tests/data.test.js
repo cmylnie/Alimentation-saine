@@ -54,6 +54,15 @@ test("aucune viande : ni dans les ingrédients, ni dans les recettes", () => {
   }
 });
 
+test('aucun des poissons que je n\'aime pas', () => {
+  const disliked = /sardine|hareng|haddock|rouget|maquereau/i;
+  for (const i of INGREDIENTS) assert.ok(!disliked.test(i.name), i.name);
+  for (const r of RECIPES) {
+    assert.ok(!disliked.test(r.name), r.name);
+    for (const s of r.steps) assert.ok(!disliked.test(s), `${r.id} : ${s}`);
+  }
+});
+
 test('chaque repas a une protéine principale et un apport raisonnable', () => {
   for (const r of RECIPES.filter(x => x.type === 'repas')) {
     assert.ok(M.mainFamily(state, r), `${r.id} sans protéine`);
