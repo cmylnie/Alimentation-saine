@@ -30,6 +30,8 @@ et de chaque journée, je compose mes propres assiettes, et la liste de courses 
 | Garder en photo un repas pris dehors | Bouton **📷** de la semaine → *À la cantine* ou *Au restaurant* (repas deviné d'après l'heure ; les photos suivantes du même repas s'y ajoutent) |
 | Renseigner plus tard ce que j'ai mangé dehors | Bandeau *à renseigner* ou toucher le repas → *Indiquer…* : les photos restent affichées pour t'aider |
 | Prévoir mes jours de cantine | *Me proposer des menus* → jours de cantine (compté ≈ 650 kcal jusqu'à la photo) |
+| Noter ce que j'ai mangé dehors, sans connaître les calories | Toucher le repas → *Qu'as-tu mangé ?* → écrire les plats séparés par des virgules (estimation automatique, corrigeable) |
+| Composer un repas sans chercher les ingrédients un par un | **Composer** → écrire la liste (« laitue, chou rouge, 2 carottes, vinaigrette ») |
 | Calculer mon objectif de calories | ⚙ Réglages → âge, taille, poids, activité, but |
 
 Les quantités de féculents sont données **crues** (le poids cuit est indiqué à côté : 50 g de quinoa

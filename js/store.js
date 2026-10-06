@@ -15,6 +15,7 @@ export function emptyState() {
     plan: [],           // [{ id, date, slot, recipeId, portions, table, leftoverOf?, done? }] ou repas dehors { id, date, slot, ext }
     shopping: {},       // { lundi: { checked: [idIngrédient], extras: [{ id, text, done }] } }
     draft: null,        // repas en cours de composition
+    myDishes: {},       // calories corrigées à la main, par nom de plat (repas dehors)
   };
 }
 
@@ -40,6 +41,7 @@ export function normalize(s) {
     if (Array.isArray(base[k]) && !Array.isArray(out[k])) out[k] = base[k];
   }
   if (!out.shopping || typeof out.shopping !== 'object') out.shopping = {};
+  if (!out.myDishes || typeof out.myDishes !== 'object') out.myDishes = {};
   out.app = APP_ID;
   out.version = SCHEMA_VERSION;
   return out;

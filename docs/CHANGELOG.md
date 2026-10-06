@@ -1,5 +1,16 @@
 # Journal des versions
 
+## 1.3.0 — 6 octobre 2026
+
+- Repas pris dehors : il suffit d'écrire le nom des plats (« colin à la crème, riz, yaourt ») ; les
+  calories sont estimées d'après les mots reconnus (poisson, sauce, frites, gratin, tarte…). Taille de
+  portion en un geste, chiffre modifiable ; une correction est retenue pour la prochaine fois.
+- Composer : la liste d'ingrédients s'écrit d'une traite (« laitue, chou rouge, 2 carottes, vinaigrette ») ;
+  sans quantité, une portion habituelle est proposée ; un ingrédient inconnu est créé avec des valeurs
+  estimées (≈). Raccourcis de quantité (« une poignée », « une portion »…).
+- Nouvel ingrédient : seul le nom est obligatoire.
+- 47 ingrédients courants en plus (laitue, choux, fruits de saison, camembert, colin, moules, sauces…).
+
 ## 1.2.1 — 6 octobre 2026
 
 - Identifiant d'installation explicite (`id` dans le manifeste) : Chrome gardait une installation ratée

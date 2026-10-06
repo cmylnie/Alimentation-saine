@@ -315,3 +315,16 @@ textarea { resize: vertical; min-height: 110px; line-height: 1.5; }
 .photo-strip { display: flex; gap: 8px; overflow-x: auto; margin: 0 0 12px; }
 .photo-strip img { flex: 0 0 auto; height: 120px; max-width: 70%; border-radius: 10px; object-fit: cover; background: var(--line); cursor: zoom-in; }
 .fab { display: flex; align-items: center; justify-content: center; font-size: 26px; }
+
+/* Plats estimés (repas dehors) */
+.ext-item { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.ext-item:last-child { border-bottom: none; }
+.ext-item .top { display: flex; align-items: center; gap: 8px; }
+.ext-item .em { font-size: 20px; width: 26px; text-align: center; flex: 0 0 auto; }
+.ext-item .n { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+.ext-item .n small { display: block; font-weight: 400; color: var(--gold); font-size: 11.5px; }
+.ext-item .kc { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+.ext-item .kc input { width: 58px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 8px; font-size: 15px; text-align: right; font-family: var(--mono); background: var(--white); color: var(--ink); }
+.ext-item .x { background: none; border: none; font-size: 18px; color: var(--coral); cursor: pointer; padding: 4px; }
+.ext-item .sizes { display: flex; gap: 6px; padding: 6px 0 0 34px; }
+.ext-item .sizes .chip { padding: 4px 10px; font-size: 12px; }

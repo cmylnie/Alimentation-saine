@@ -3,10 +3,11 @@ import * as A from './actions.js';
 import * as S from './store.js';
 import { AISLES, GROUPS, UNITS } from './data/ingredients.js';
 import { DISHES, DISH_CATS, SIZES } from './data/dishes.js';
+import { PRESETS } from './data/estimates.js';
 import * as P from './photos.js';
 import { todayISO, addDays, mondayOf, weekDays, labelDay, labelDayShort, labelWeek, JOURS_COURT } from './dates.js';
 
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 
 let state = S.load();
 let view = 'semaine';
@@ -425,23 +426,53 @@ function extSheet(id) {
   if (e.ext.photos.length) {
     h += `<div class="photos">${e.ext.photos.map(p => `<div class="ph"><img data-photo="${p}" alt="Photo du repas" data-act="viewphoto" data-id="${p}"><button class="x" data-act="delphoto" data-id="${id}|${p}" aria-label="Supprimer la photo">×</button></div>`).join('')}</div>`;
   }
-  h += `<h3>${cantine ? 'Sur mon plateau' : 'Plats commandés'}</h3>
-    <div class="card" style="padding:0 12px;margin-bottom:10px">${e.ext.items.length ? e.ext.items.map(it => `<div class="comp-line">
-      ${it.photo ? `<img class="thumb" data-photo="${it.photo}" data-act="viewphoto" data-id="${it.photo}" alt="">` : `<span style="font-size:20px;width:26px;text-align:center">${it.emoji}</span>`}
-      <div class="n">${esc(it.label)}<small>${it.kcal} kcal${it.p ? ` · ${it.p} g de protéines` : ''}</small></div>
-      <button class="x" data-act="delitem" data-id="${id}|${it.id}" aria-label="Retirer">×</button></div>`).join('') : '<p class="empty">Rien pour l\'instant.</p>'}</div>
+  h += `<h3>Qu'as-tu mangé ?</h3>
+    <form class="add-row" id="extText" style="margin:0 0 6px"><input name="t" placeholder="Ex. : colin à la crème, riz, yaourt" autocomplete="off" enterkeyhint="done"><button class="btn btn-primary">Ajouter</button></form>
+    <p class="small muted" style="margin:0 0 12px">Écris juste le nom des plats, séparés par une virgule : les calories sont estimées. Ajuste la taille ou le chiffre si tu veux.</p>
+    ${e.ext.items.length ? `<div class="card" style="padding:0 12px;margin-bottom:10px">${e.ext.items.map(it => `<div class="ext-item">
+      <div class="top">
+        <span class="em">${it.emoji}</span>
+        <div class="n">${esc(it.label)}${it.approx ? '<small>Plat non reconnu : estimation moyenne</small>' : ''}</div>
+        <label class="kc"><input inputmode="numeric" data-kcal="${it.id}" value="${it.kcal}" aria-label="Calories"> kcal</label>
+        <button class="x" data-act="delitem" data-id="${id}|${it.id}" aria-label="Retirer">×</button>
+      </div>
+      <div class="sizes">${SIZES.map(sz => `<button class="chip ${(it.size || 'normale') === sz.id ? 'on' : ''}" data-act="isize" data-id="${id}|${it.id}|${sz.id}">${sz.name}</button>`).join('')}</div>
+    </div>`).join('')}</div>` : ''}
     <div class="stack">
-      ${e.ext.photos.length || e.ext.items.length
-        ? `<button class="btn btn-primary" data-act="adddish" data-id="${id}">+ Indiquer ${cantine ? 'ce qu\'il y avait sur le plateau' : 'un plat'}</button>${photoInput('photo', id, cantine ? '📷 Autre photo' : '📷 Photo d\'un autre plat')}`
-        : `${photoInput('photo', id, cantine ? '📷 Photo du plateau' : '📷 Photo d\'un plat', true)}<button class="btn btn-secondary" data-act="adddish" data-id="${id}">+ Indiquer ce que j'ai mangé</button>`}
+      ${photoInput('photo', id, e.ext.photos.length ? '📷 Autre photo' : cantine ? '📷 Photo du plateau (aide-mémoire)' : '📷 Photo d\'un plat (aide-mémoire)')}
+      <button class="btn btn-secondary" data-act="adddish" data-id="${id}">Choisir dans la liste des plats</button>
     </div>
     <div class="actions-grid" style="margin-top:14px">
       <button class="btn btn-primary wide" data-act="done" data-id="${id}">${e.done ? 'Finalement, pas encore mangé' : "✓ C'est mangé"}</button>
       <button class="btn btn-secondary" data-act="move" data-id="${id}">Déplacer</button>
       <button class="btn btn-danger" data-act="delentry" data-id="${id}">Retirer</button>
     </div>`;
-  openSheet(h, root => { bindPhotoInputs(root); showPhotos(root); });
+  openSheet(h, root => {
+    bindPhotoInputs(root); showPhotos(root);
+    const f = root.querySelector('#extText');
+    f.onsubmit = ev => {
+      ev.preventDefault();
+      const t = f.elements.t.value.trim();
+      if (!t) return;
+      A.addExtFromText(state, id, t);
+      commit(); extSheet(id);
+    };
+    root.querySelectorAll('[data-kcal]').forEach(inp => {
+      inp.onchange = () => {
+        const v = num(inp.value);
+        if (inp.value.trim() === '' || !(v >= 0)) { inp.value = ''; return; }
+        A.setExtItemKcal(state, id, inp.dataset.kcal, v);
+        commit(); extSheet(id);
+        toast('Noté : je m\'en souviendrai pour ce plat.');
+      };
+    });
+  });
 }
+ACTIONS.isize = v => {
+  const [id, itemId, size] = v.split('|');
+  A.setExtItemSize(state, id, itemId, size);
+  commit(); extSheet(id);
+};
 
 ACTIONS.adddish = id => dishPicker(id);
 // Photo en grand pendant qu'on renseigne le repas.
@@ -513,15 +544,17 @@ function dishPicker(id) {
     openSheet(`<form><h2>Autre plat</h2>
       <p class="intro">Les calories sont parfois indiquées sur le menu ou l'emballage. Sinon, fais au plus proche.</p>
       <div class="field"><label>Plat</label><input name="label" required placeholder="Ex. : Gratin de poisson"></div>
-      <div class="field"><label>Calories (kcal)</label><input name="kcal" inputmode="numeric" required></div>
+      <div class="field"><label>Calories (kcal), si tu les connais</label><input name="kcal" inputmode="numeric" placeholder="Sinon, je les estime"></div>
       ${btnRow('Ajouter', 'Retour')}</form>`, root => {
       root.querySelector('[data-cancel]').onclick = () => dishPicker(id);
       root.querySelector('form').addEventListener('submit', ev => {
         ev.preventDefault();
         const f = ev.target;
-        const k = num(f.elements.kcal.value);
-        if (!(k >= 0)) { f.querySelector('.error').textContent = 'Indique les calories.'; return; }
-        A.addExtItem(state, id, { label: f.elements.label.value.trim() || 'Plat', kcal: k });
+        const label = f.elements.label.value.trim();
+        if (!label) { f.querySelector('.error').textContent = 'Écris le nom du plat.'; return; }
+        const raw = f.elements.kcal.value.trim();
+        if (raw === '') A.addExtFromText(state, id, label.replace(/[,;+]/g, ' '));
+        else A.addExtItem(state, id, { label, kcal: num(raw) || 0 });
         commit();
         dishPicker(id);
       });
@@ -769,7 +802,7 @@ function viewComposer() {
     if (!ing) return;
     const u = UNITS[ing.unit];
     const k = Math.round(q * (ing.w || 1) / 100 * ing.kcal / (d.servings || 1));
-    lines += `<div class="comp-line"><div class="n">${esc(ing.unit === 'pc' && q > 1 && ing.pl ? ing.pl : ing.name)}<small>${k} kcal par portion${ing.cooked && ing.unit === 'g' ? ` · ≈ ${Math.round(q * ing.cooked)} g cuit` : ''}</small></div>
+    lines += `<div class="comp-line"><div class="n">${ing.estimated ? '≈ ' : ''}${esc(ing.unit === 'pc' && q > 1 && ing.pl ? ing.pl : ing.name)}<small>${k} kcal par portion${ing.cooked && ing.unit === 'g' ? ` · ≈ ${Math.round(q * ing.cooked)} g cuit` : ''}</small></div>
       <input inputmode="decimal" data-qty="${i}" value="${String(Math.round(q * 100) / 100).replace('.', ',')}" aria-label="Quantité">
       <span class="u">${ing.unit === 'pc' ? 'pièce' : u.label}</span>
       <button class="x" data-act="cdel" data-id="${i}" aria-label="Retirer">×</button></div>`;
@@ -789,9 +822,11 @@ function viewComposer() {
         <div class="stepper"><button data-act="cserv" data-id="-1">−</button><b>${d.servings}</b><button data-act="cserv" data-id="1">+</button></div></div>
       <div class="field"><label>Icône</label><div class="chips" style="padding:0">${EMOJIS.map(e => `<button class="chip ${e === d.emoji ? 'on' : ''}" data-act="cemoji" data-id="${e}" style="font-size:18px;padding:4px 8px">${e}</button>`).join('')}</div></div>
     </div>
-    <div class="section-title">Ingrédients <button class="link" data-act="cadd">+ Ajouter</button></div>
+    <div class="section-title">Ingrédients</div>
+    <div class="section"><form class="add-row" id="ctext" style="margin:0 0 6px"><input name="t" placeholder="Ex. : laitue, chou rouge, 2 carottes, maïs, vinaigrette" autocomplete="off" enterkeyhint="done"><button class="btn btn-primary">Ajouter</button></form>
+      <p class="small muted" style="margin:0 0 10px">Écris les ingrédients séparés par une virgule. Sans quantité, je mets une portion habituelle ; un ingrédient inconnu est estimé (≈). Tu peux tout corriger ensuite.</p></div>
     <div class="section"><div class="card" style="padding:4px 14px">${lines || '<p class="empty">Aucun ingrédient pour l\'instant.</p>'}</div>${advice}
-      <button class="btn btn-secondary" style="margin-top:10px" data-act="cadd">+ Ajouter un ingrédient</button></div>
+      <button class="btn btn-secondary" style="margin-top:10px" data-act="cadd">Chercher dans la liste des ingrédients</button></div>
     <div class="section-title">Préparation (facultatif)</div>
     <div class="section"><div class="field"><textarea id="csteps" placeholder="Une étape par ligne">${esc(d.steps.join('\n'))}</textarea></div>
       <p class="error" id="cerr"></p>
@@ -810,6 +845,17 @@ function readDraftFields(root = $('#view')) {
 
 function mountComposer(root) {
   const save = () => { readDraftFields(root); S.save(state); };
+  const tf = root.querySelector('#ctext');
+  tf.onsubmit = ev => {
+    ev.preventDefault();
+    const t = tf.elements.t.value.trim();
+    if (!t) return;
+    readDraftFields(root);
+    const lines = A.addIngredientsFromText(state, state.draft, t);
+    commit();
+    const guessed = lines.filter(l => !l.ing).length;
+    toast(guessed ? `${plural(lines.length, 'ingrédient ajouté', 'ingrédients ajoutés')}, dont ${guessed} estimé${guessed > 1 ? 's' : ''} (≈).` : `${plural(lines.length, 'ingrédient ajouté', 'ingrédients ajoutés')}.`);
+  };
   root.querySelectorAll('#cname, #ctype, #ctime, #csteps').forEach(el => { el.onchange = save; });
   root.querySelectorAll('[data-qty]').forEach(inp => {
     inp.onchange = () => {
@@ -847,8 +893,9 @@ ACTIONS.cadd = () => {
     const list = M.allIngredients(state)
       .filter(i => (words.length ? words.every(w => M.norm(i.name).includes(w)) : i.group === group))
       .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-    root.querySelector('.pick-list').innerHTML = list.map(i => `<div class="pick" data-act="cpick" data-id="${i.id}">${esc(i.name)}<span>${i.kcal} kcal/100 g</span></div>`).join('')
-      || '<p class="empty">Introuvable. Tu peux le créer ci-dessous.</p>';
+    const create = q.trim() && !list.some(i => M.norm(i.name) === M.norm(q.trim()))
+      ? `<div class="pick" data-act="quicking"><b>+ Ajouter « ${esc(q.trim())} »</b><span>valeurs estimées</span></div>` : '';
+    root.querySelector('.pick-list').innerHTML = create + list.map(i => `<div class="pick" data-act="cpick" data-id="${i.id}">${i.estimated ? '≈ ' : ''}${esc(i.name)}<span>${i.kcal} kcal/100 g</span></div>`).join('');
     root.querySelectorAll('[data-g]').forEach(b => b.classList.toggle('on', !words.length && b.dataset.g === group));
   };
   openSheet(`<h2>Ajouter un ingrédient</h2>
@@ -860,17 +907,25 @@ ACTIONS.cadd = () => {
     root.querySelectorAll('[data-g]').forEach(b => { b.onclick = () => { group = b.dataset.g; q = ''; root.querySelector('input').value = ''; draw(root); }; });
     draw(root);
   });
+  ACTIONS.quicking = () => {
+    const name = q.trim().charAt(0).toUpperCase() + q.trim().slice(1);
+    const ing = M.matchIngredient(state, name) || A.addCustomIngredient(state, { name });
+    S.save(state);
+    ACTIONS.cpick(ing.id);
+  };
 };
 ACTIONS.cpick = id => {
   const ing = M.ingredient(state, id);
-  const def = { g: 100, ml: 100, pc: 1, cas: 1, cac: 1, tranche: 1, botte: 0.25, pincee: 1 }[ing.unit] ?? 1;
+  const def = Math.round(M.quantityFor(ing, null, null) * 100) / 100;
   const u = ing.unit === 'pc' ? (ing.pl ? 'pièce(s)' : 'pièce(s)') : UNITS[ing.unit].label;
   openSheet(`<form><h2>${esc(ing.name)}</h2>
-    <p class="intro">${ing.kcal} kcal pour 100 g${ing.unit !== 'g' && ing.unit !== 'ml' ? ` · 1 ${ing.unit === 'pc' ? 'pièce' : UNITS[ing.unit].label} ≈ ${ing.w} g` : ''}${ing.cooked ? ` · poids sec (× ${ing.cooked} une fois cuit)` : ''}</p>
+    <p class="intro">≈ ${ing.kcal} kcal pour 100 g${ing.unit !== 'g' && ing.unit !== 'ml' ? ` · 1 ${ing.unit === 'pc' ? 'pièce' : UNITS[ing.unit].label} ≈ ${ing.w} g` : ''}${ing.cooked ? ` · poids sec (× ${ing.cooked} une fois cuit)` : ''}</p>
+    ${ing.estimated ? '<p class="small muted" style="margin:-8px 0 12px">≈ Valeurs estimées d\'après le nom : pas besoin de les connaître.</p>' : ''}
+    ${ing.unit === 'g' || ing.unit === 'ml' ? `<div class="chips" style="padding:0 0 12px">${(PRESETS[ing.group] || PRESETS.autre).map(([l, g]) => `<button type="button" class="chip" data-preset="${g}">${l} · ${g} g</button>`).join('')}</div>` : ''}
     <div class="field"><label>Quantité (${esc(u)})${state.draft.servings > 1 ? ` pour ${state.draft.servings} portions` : ''}</label><input name="q" inputmode="decimal" value="${String(def).replace('.', ',')}" required></div>
     ${btnRow('Ajouter')}</form>`, root => {
     const inp = root.querySelector('[name=q]');
-    inp.focus(); inp.select();
+    root.querySelectorAll('[data-preset]').forEach(b => { b.onclick = () => { inp.value = b.dataset.preset; root.querySelector('form').requestSubmit(); }; });
     bindForm(root, form => {
       const v = num(form.elements.q.value);
       if (!(v > 0)) throw new Error('Indique une quantité.');
@@ -882,32 +937,26 @@ ACTIONS.cpick = id => {
 };
 ACTIONS.newing = () => {
   openSheet(`<form><h2>Nouvel ingrédient</h2>
-    <p class="intro">Les valeurs sont sur l'emballage (« pour 100 g »).</p>
+    <p class="intro">Seul le nom suffit : je devine le reste. Si tu as l'emballage, tu peux préciser les valeurs « pour 100 g ».</p>
     <div class="field"><label>Nom</label><input name="name" required></div>
+    <details class="fold"><summary class="link" style="display:block;margin-bottom:12px">Préciser (facultatif)</summary>
     <div class="row2">
-      <div class="field"><label>Groupe</label><select name="group">${GROUPS.map(g => `<option value="${g.id}">${g.name}</option>`).join('')}</select></div>
-      <div class="field"><label>Rayon</label><select name="aisle">${AISLES.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select></div>
-    </div>
-    <div class="field"><label>Protéine principale ?</label><select name="fam"><option value="">Non</option>${M.FAMILIES.map(f => `<option value="${f.id}">${f.icon} ${f.name}</option>`).join('')}</select></div>
-    <div class="row2">
-      <div class="field"><label>Compté en</label><select name="unit"><option value="g">grammes</option><option value="pc">pièces</option></select></div>
-      <div class="field"><label>Poids d'une pièce (g)</label><input name="w" inputmode="decimal" placeholder="si pièces"></div>
+      <div class="field"><label>Groupe</label><select name="group"><option value="">Deviner</option>${GROUPS.map(g => `<option value="${g.id}">${g.name}</option>`).join('')}</select></div>
+      <div class="field"><label>Rayon</label><select name="aisle"><option value="">Deviner</option>${AISLES.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select></div>
     </div>
     <div class="row2">
-      <div class="field"><label>kcal / 100 g</label><input name="kcal" inputmode="decimal" required></div>
+      <div class="field"><label>kcal / 100 g</label><input name="kcal" inputmode="decimal" placeholder="?"></div>
       <div class="field"><label>Protéines</label><input name="p" inputmode="decimal" placeholder="g"></div>
     </div>
     <div class="row2">
       <div class="field"><label>Glucides</label><input name="c" inputmode="decimal" placeholder="g"></div>
       <div class="field"><label>Lipides</label><input name="f" inputmode="decimal" placeholder="g"></div>
-    </div>
+    </div></details>
     ${btnRow('Créer')}</form>`, root => bindForm(root, form => {
-    const v = n => { const x = num(form.elements[n].value); return Number.isFinite(x) ? x : 0; };
-    const kc = num(form.elements.kcal.value);
-    if (!Number.isFinite(kc)) throw new Error('Indique les calories pour 100 g.');
+    const raw = n => form.elements[n].value.trim().replace(',', '.');
     const ing = A.addCustomIngredient(state, {
-      name: form.elements.name.value, group: form.elements.group.value, aisle: form.elements.aisle.value, fam: form.elements.fam.value,
-      unit: form.elements.unit.value, w: v('w'), kcal: kc, p: v('p'), c: v('c'), f: v('f'),
+      name: form.elements.name.value, group: form.elements.group.value, aisle: form.elements.aisle.value,
+      kcal: raw('kcal'), p: raw('p'), c: raw('c'), f: raw('f'),
     });
     S.save(state);
     ACTIONS.cpick(ing.id);

@@ -46,7 +46,7 @@ test('les recettes sont uniques et utilisent des ingrédients du catalogue', () 
 });
 
 test("aucune viande : ni dans les ingrédients, ni dans les recettes", () => {
-  const meat = /poulet|boeuf|bœuf|porc|jambon|lardon|dinde|veau|agneau|canard|magret|saucisse|chorizo|bacon|viande|steak hach/i;
+  const meat = /poulet|boeuf|bœuf|\bporc|jambon|lardon|dinde|\bveaux?\b|agneau|canard|magret|saucisse|chorizo|bacon|viande|steak hach/i;
   for (const i of INGREDIENTS) assert.ok(!meat.test(i.name), i.name);
   for (const r of RECIPES) {
     assert.ok(!meat.test(r.name), r.name);

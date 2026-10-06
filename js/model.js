@@ -2,6 +2,7 @@
 import { INGREDIENTS, UNITS, AISLES } from './data/ingredients.js';
 import { RECIPES } from './data/recipes.js';
 import { DISHES, SIZES } from './data/dishes.js';
+import { DISH_RULES, UNKNOWN_DISH, INGREDIENT_GUESS, UNKNOWN_INGREDIENT, DEFAULT_GRAMS } from './data/estimates.js';
 import { weekDays } from './dates.js';
 
 export const SLOTS = [
@@ -389,4 +390,132 @@ export function estimateNeeds({ sex = 'f', age, height, weight, activity = 'repo
   const raw = maintain + g.delta;
   const target = Math.round(Math.max(raw, floor) / 50) * 50;
   return { bmr: Math.round(bmr), maintain: Math.round(maintain / 50) * 50, target, floored: raw < floor, protein: Math.round(weight * 1) };
+}
+
+/* ---------------- Estimation à partir d'un simple nom ---------------- */
+
+const compile = rules => rules.map(([src, ...rest]) => [new RegExp(`\\b(?:${src})\\b`), ...rest]);
+const DISH_RE = compile(DISH_RULES);
+const GUESS_RE = compile(INGREDIENT_GUESS);
+const capFirst = t => t.charAt(0).toUpperCase() + t.slice(1);
+const NUMBERS = { un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, demi: 0.5, demie: 0.5 };
+
+// « 2 », « 1,5 », « 1/2 », « deux », « demi » en début de texte.
+function leadingNumber(t) {
+  const m = t.match(/^(\d+(?:[.,]\d+)?|\d+\/\d+|½|un|une|deux|trois|quatre|cinq|six|demie?)\b\s*/);
+  if (!m) return { n: null, rest: t };
+  const w = m[1];
+  let n = NUMBERS[w];
+  if (n == null) n = w === '½' ? 0.5 : w.includes('/') ? Number(w.split('/')[0]) / Number(w.split('/')[1]) : Number(w.replace(',', '.'));
+  return { n: n > 0 ? n : null, rest: t.slice(m[0].length) };
+}
+
+// Découpe « colin à la crème, riz et haricots verts + yaourt » en plats.
+export const splitList = text => String(text || '').split(/[,;+\n]|\s(?:et|puis|avec)\s/i).map(x => x.trim()).filter(Boolean);
+
+// Estimation d'un plat d'après son nom (portion normale). Les plats corrigés par l'utilisatrice sont retenus.
+export function estimateDish(state, text) {
+  const label = capFirst(String(text).trim());
+  const key = norm(label);
+  const mine = (state.myDishes || {})[key];
+  if (mine) return { label, kcal: mine.kcal, p: mine.p || 0, emoji: mine.emoji || '🍽️', approx: false, learned: true };
+  let { n, rest } = leadingNumber(key);
+  let kcal = 0, p = 0, emoji = '', mains = 0;
+  for (const [re, k, prot, em] of DISH_RE) {
+    if (!re.test(rest)) continue;
+    kcal += k; p += prot;
+    if (em) { mains++; if (!emoji) emoji = em; }
+    rest = rest.replace(re, ' ');
+  }
+  if (/\bparts?\b/.test(key) && /\bpizzas?\b/.test(key)) { kcal -= 500; p -= 20; }   // une part, pas la pizza entière
+  const approx = mains === 0;
+  if (approx) { kcal += UNKNOWN_DISH.kcal; p += UNKNOWN_DISH.p; emoji = UNKNOWN_DISH.emoji; }
+  const mult = n || 1;
+  return { label, kcal: Math.round(kcal * mult), p: Math.round(p * mult), emoji, approx };
+}
+
+export const estimateMeal = (state, text) => splitList(text).map(t => estimateDish(state, t));
+
+// Taille de portion appliquée à une estimation.
+export const sized = (base, sizeId) => {
+  const k = (SIZES.find(x => x.id === sizeId) || SIZES[1]).k;
+  return { kcal: Math.round(base.kcal * k), p: Math.round((base.p || 0) * k) };
+};
+
+/* ---------------- Ingrédients écrits en toutes lettres ---------------- */
+
+const STOP = new Set(['de', 'd', 'du', 'des', 'la', 'le', 'les', 'l', 'a', 'au', 'aux', 'en', 'et', 'un', 'une', 'avec']);
+const sing = w => (w.length > 3 ? w.replace(/(s|x)$/, '') : w);
+const tokens = t => norm(t).replace(/\(.*?\)/g, ' ').split(/[^a-z0-9]+/).filter(w => w && !STOP.has(w)).map(sing);
+
+// Meilleur ingrédient du catalogue pour un nom écrit librement (ou null).
+export function matchIngredient(state, phrase) {
+  const words = new Set(tokens(phrase));
+  if (!words.size) return null;
+  let best = null, bestScore = 0;
+  for (const ing of allIngredients(state)) {
+    for (const name of [ing.name, ing.pl].filter(Boolean)) {
+      const key = tokens(name);
+      if (!key.length || !key.every(w => words.has(w))) continue;
+      const score = key.length * 10 - Math.abs(words.size - key.length);
+      if (score > bestScore) { best = ing; bestScore = score; }
+    }
+  }
+  return best;
+}
+
+// Groupe et valeurs moyennes pour un ingrédient inconnu, d'après son nom.
+export function guessIngredient(name) {
+  const t = norm(name);
+  for (const [re, group, aisle, kcal, p, c, f, fam] of GUESS_RE) {
+    if (re.test(t)) return { group, aisle, kcal, p, c, f, ...(fam ? { fam } : {}) };
+  }
+  return { ...UNKNOWN_INGREDIENT };
+}
+
+const UNIT_WORDS = [
+  [/^(kg|kilos?)\b/, 'g', 1000], [/^(g|gr|grammes?)\b/, 'g', 1], [/^(ml)\b/, 'g', 1], [/^(cl)\b/, 'g', 10], [/^(l|litres?)\b/, 'g', 1000],
+  [/^(c\.? ?a\.? ?s\.?|cas|cuill?eres? a soupe|cuill?eres?)\b/, 'cas', 1], [/^(c\.? ?a\.? ?c\.?|cac|cuill?eres? a cafe)\b/, 'cac', 1],
+  [/^(tranches?)\b/, 'tranche', 1], [/^(poignees?)\b/, 'g', 40], [/^(bottes?|bouquets?)\b/, 'botte', 1], [/^(pincees?)\b/, 'pincee', 1],
+];
+
+// Quantité dans l'unité de l'ingrédient, à partir de « 200 g », « 2 », « 1 c. à s. » ou rien.
+export function quantityFor(ing, n, unit) {
+  const w = ing.w || 1;
+  const toUnit = grams => (ing.unit === 'g' || ing.unit === 'ml' ? grams : grams / w);
+  if (unit === 'g') return toUnit(n);
+  if (unit && unit !== 'g') {
+    if (ing.unit === unit) return n;
+    const grams = { cas: 15, cac: 5, tranche: 30, botte: 30, pincee: 0.5 }[unit] * n;
+    return toUnit(grams);
+  }
+  if (n != null) return ['g', 'ml'].includes(ing.unit) ? n * 50 : n;
+  if (ing.unit === 'pc') return ing.fam === 'oeufs' ? 2 : 1;
+  if (ing.unit === 'botte') return 0.25;
+  if (ing.unit !== 'g' && ing.unit !== 'ml') return 1;
+  if (ing.group === 'feculent') return ing.cooked ? 60 : ing.aisle === 'legumes' ? 200 : 50;
+  if (ing.aisle === 'epices') return 2;
+  return ing.group === 'legume' && ing.kcal < 20 ? 60 : DEFAULT_GRAMS[ing.group] || 50;
+}
+
+// « laitue, 2 tomates, 100 g de feta, vinaigrette » → lignes { ing | guess, qty }.
+// Un ingrédient inconnu est décrit par `guess` (à créer) avec des valeurs moyennes.
+export function parseIngredients(state, text) {
+  return splitList(text).map(raw => {
+    let t = norm(raw);
+    const lead = leadingNumber(t);
+    t = lead.rest;
+    let unit = null, mult = 1;
+    for (const [re, u, k] of UNIT_WORDS) {
+      const m = t.match(re);
+      if (m) { unit = u; mult = k; t = t.slice(m[0].length).trim(); break; }
+    }
+    t = t.replace(/^(de |d'|d’|du |des )/, '').trim();
+    const n = lead.n != null ? lead.n * mult : unit ? mult : null;
+    const ing = matchIngredient(state, t);
+    if (ing) return { raw, ing, qty: quantityFor(ing, n, unit) };
+    const cleaned = String(raw).trim().replace(/^[\d.,/½]+\s*/, '').replace(/^(kg|g|gr|grammes?|ml|cl|l)\s+(de |d')?/i, '').trim();
+    const guess = { name: capFirst(cleaned || raw.trim()), unit: 'g', w: 1, ...guessIngredient(t || raw) };
+    return { raw, guess, qty: quantityFor(guess, n, unit) };
+  });
 }

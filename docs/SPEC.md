@@ -8,6 +8,7 @@
 | `js/data/ingredients.js` | Catalogue unique des ingrédients : rayon, groupe, unité, valeurs pour 100 g |
 | `js/data/recipes.js` | Recettes de base (pescétariennes) |
 | `js/data/dishes.js` | Plats courants de cantine et de restaurant (kcal et protéines par portion normale) |
+| `js/data/estimates.js` | Mots reconnus pour estimer un plat ou un ingrédient d'après son seul nom, portions habituelles |
 | `js/photos.js` | Photos des repas dehors : réduites à 1 280 px (JPEG), rangées dans IndexedDB |
 | `js/dates.js` | Dates en chaînes locales `YYYY-MM-DD`, semaines du lundi au dimanche |
 | `js/model.js` | **Calculs purs** : nutrition, quantités, journées, liste de courses, recherche, suggestions |
@@ -51,6 +52,12 @@
   qu'aucun plat n'est indiqué, l'estimation du lieu est comptée (650 kcal cantine, 900 kcal restaurant).
   Bouton 📷 : repas deviné d'après l'heure (avant 11 h petit-déj, 15 h déjeuner, 18 h goûter, puis dîner). Jamais dans les courses ni les restes. Portion
   petite / normale / grande = × 0,75 / 1 / 1,3. Les photos d'un repas retiré sont effacées après le délai d'annulation.
+- **Estimation par le nom** : le texte est découpé (virgule, « et », « + », « avec »…), puis chaque morceau est
+  comparé, sans accents, aux règles de `DISH_RULES` dans l'ordre ; un passage reconnu n'est compté qu'une fois
+  et les sauces ou cuissons s'ajoutent au plat. Rien de reconnu : 350 kcal (signalé). Un nombre en tête
+  multiplie (« 2 œufs ») ; « part de pizza » = 300 kcal. Une correction manuelle est retenue dans `myDishes`
+  (valeur d'une portion normale). Ingrédients : meilleur nom du catalogue (mots au singulier), sinon
+  ingrédient créé avec les valeurs moyennes de `INGREDIENT_GUESS` (`estimated: true`).
 - **Objectif de calories** : Mifflin-St Jeor (`10 × poids + 6,25 × taille − 5 × âge − 161` pour une
   femme, `+ 5` pour un homme) × activité (1,2 sans sport … 1,725), moins 0, 300 ou 500 kcal selon le but,
   jamais sous `max(1 200 kcal femme / 1 500 homme, métabolisme de base)`, arrondi à 50.

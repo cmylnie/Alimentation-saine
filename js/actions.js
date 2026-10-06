@@ -68,17 +68,22 @@ export function deleteCustomRecipe(state, id) {
   state.favorites = state.favorites.filter(x => x !== id);
 }
 
+// Seul le nom est obligatoire : groupe, rayon et valeurs manquants sont estimés d'après le nom.
 export function addCustomIngredient(state, { name, aisle, group, unit, w, kcal, p, c, f, fam }) {
   if (!name || !name.trim()) throw new Error("Donne un nom à l'ingrédient.");
-  if (!(kcal >= 0)) throw new Error('Indique les calories pour 100 g.');
   const key = M.norm(name.trim());
   if (M.allIngredients(state).some(i => M.norm(i.name) === key)) throw new Error('Cet ingrédient existe déjà.');
+  const g = M.guessIngredient(name);
+  const known = v => v !== '' && v != null && Number.isFinite(Number(v));
+  const estimated = !known(kcal);
   const ing = {
-    id: 'ui-' + M.defaultId(), name: name.trim(), aisle: aisle || 'epicerie', group: group || 'autre',
+    id: 'ui-' + M.defaultId(), name: name.trim(), aisle: aisle || g.aisle, group: group || g.group,
     unit: unit === 'pc' ? 'pc' : 'g', w: unit === 'pc' ? Math.max(1, Number(w) || 100) : 1,
-    kcal: Number(kcal) || 0, p: Number(p) || 0, c: Number(c) || 0, f: Number(f) || 0, custom: true,
+    kcal: estimated ? g.kcal : Number(kcal), p: known(p) ? Number(p) : estimated ? g.p : 0,
+    c: known(c) ? Number(c) : estimated ? g.c : 0, f: known(f) ? Number(f) : estimated ? g.f : 0, custom: true,
   };
-  if (fam) ing.fam = fam;
+  if (estimated) ing.estimated = true;
+  if (fam || (!group && g.fam)) ing.fam = fam || g.fam;
   state.customIngredients.push(ing);
   return ing;
 }
@@ -125,7 +130,9 @@ export function addExtItem(state, id, item, newId = M.defaultId) {
   const ext = extOf(state, id);
   if (!item.label || !(item.kcal >= 0)) throw new Error('Indique le plat et ses calories.');
   const it = { id: newId(), label: item.label, emoji: item.emoji || '🍽️', kcal: Math.round(item.kcal), p: Math.round(item.p || 0) };
-  if (item.dishId) { it.dishId = item.dishId; it.size = item.size; }
+  if (item.dishId) { it.dishId = item.dishId; it.size = item.size; it.base = { kcal: M.dish(item.dishId).kcal, p: M.dish(item.dishId).p }; }
+  if (item.base) { it.base = item.base; it.size = item.size || 'normale'; }
+  if (item.approx) it.approx = true;
   if (item.photo) it.photo = item.photo;
   ext.items.push(it);
   delete ext.estimate;
@@ -148,3 +155,44 @@ export function removeExtPhoto(state, id, photoId) {
 
 // Toutes les photos rattachées à un repas (pour les effacer avec lui).
 export const photosOf = e => (e && e.ext ? [...e.ext.photos, ...e.ext.items.map(i => i.photo).filter(Boolean)] : []);
+
+// Remplit un repas à composer à partir d'une liste écrite ; crée les ingrédients inconnus (valeurs estimées).
+export function addIngredientsFromText(state, draft, text) {
+  const lines = M.parseIngredients(state, text);
+  for (const l of lines) {
+    let ing = l.ing;
+    if (!ing) ing = M.matchIngredient(state, l.guess.name) || addCustomIngredient(state, { name: l.guess.name });
+    const ex = draft.ing.find(([i]) => i === ing.id);
+    if (ex) ex[1] += l.qty; else draft.ing.push([ing.id, l.qty]);
+  }
+  return lines;
+}
+
+/* ---------- Repas dehors : saisie par le nom ---------- */
+
+// « colin à la crème, riz, yaourt » → un plat estimé par morceau.
+export function addExtFromText(state, id, text, newId = M.defaultId) {
+  const est = M.estimateMeal(state, text);
+  if (!est.length) throw new Error('Écris au moins un plat.');
+  return est.map(d => addExtItem(state, id, { ...d, base: { kcal: d.kcal, p: d.p }, size: 'normale' }, newId));
+}
+
+// Taille de portion d'un plat (les plats estimés gardent leur valeur de base).
+export function setExtItemSize(state, id, itemId, size) {
+  const it = extOf(state, id).items.find(i => i.id === itemId);
+  if (!it) return;
+  if (!it.base) it.base = { kcal: it.kcal, p: it.p };
+  Object.assign(it, M.sized(it.base, size), { size });
+}
+
+// Calories corrigées à la main : retenues pour la prochaine fois que ce plat est écrit.
+export function setExtItemKcal(state, id, itemId, kcal) {
+  const it = extOf(state, id).items.find(i => i.id === itemId);
+  if (!it || !(kcal >= 0)) return;
+  const k = M.sized({ kcal: 1000, p: 0 }, it.size || 'normale').kcal / 1000;
+  it.kcal = Math.round(kcal);
+  it.base = { kcal: Math.round(kcal / k), p: it.base ? it.base.p : it.p };
+  delete it.approx;
+  if (!state.myDishes) state.myDishes = {};
+  state.myDishes[M.norm(it.label)] = { kcal: it.base.kcal, p: it.base.p || 0, emoji: it.emoji };
+}
