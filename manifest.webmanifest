@@ -3,6 +3,7 @@
   "short_name": "Assiette",
   "description": "Menus de la semaine, recettes, calories et liste de courses.",
   "lang": "fr",
+  "id": "./?app=mon-assiette",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

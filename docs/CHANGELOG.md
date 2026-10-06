@@ -1,5 +1,11 @@
 # Journal des versions
 
+## 1.2.1 — 6 octobre 2026
+
+- Identifiant d'installation explicite (`id` dans le manifeste) : Chrome gardait une installation ratée
+  (« appli déjà installée » mais impossible à ouvrir) ; l'appli est désormais vue comme nouvelle et
+  s'installe normalement.
+
 ## 1.2.0 — 5 octobre 2026
 
 - La photo d'un repas pris dehors sert d'aide-mémoire : on la prend sur le moment, on indique les plats

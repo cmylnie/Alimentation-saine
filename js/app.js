@@ -6,7 +6,7 @@ import { DISHES, DISH_CATS, SIZES } from './data/dishes.js';
 import * as P from './photos.js';
 import { todayISO, addDays, mondayOf, weekDays, labelDay, labelDayShort, labelWeek, JOURS_COURT } from './dates.js';
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 
 let state = S.load();
 let view = 'semaine';
