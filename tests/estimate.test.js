@@ -99,3 +99,28 @@ test('nouvel ingrédient : seul le nom est obligatoire', () => {
   assert.ok(!exact.estimated);
   assert.throws(() => A.addCustomIngredient(s, { name: '  ' }));
 });
+
+test('desserts et en-cas reconnus', () => {
+  const s = emptyState();
+  const k = t => M.estimateDish(s, t);
+  for (const t of ['yaourt', 'crème brûlée', 'muffin', 'biscuits', 'barre de céréales', 'smoothie', 'une poignée d\'amandes', '2 carrés de chocolat', 'île flottante'])
+    assert.ok(!k(t).approx, `${t} non reconnu`);
+  assert.equal(k('crème brûlée').kcal, 300);
+  assert.equal(k('2 carrés de chocolat').kcal, 110);
+});
+
+test('saisie libre à la maison : rangée dans le repas, sans bloquer les propositions', () => {
+  const s = emptyState();
+  const a = A.addQuickText(s, { date: '2026-10-05', slot: 'diner', text: 'crème brûlée' }, ids);
+  const b = A.addQuickText(s, { date: '2026-10-05', slot: 'diner', text: 'muffin' }, ids);
+  assert.equal(a.entry.id, b.entry.id, 'un seul ajout par repas');
+  assert.equal(a.entry.ext.items.length, 2);
+  assert.equal(M.dayTotals(s, '2026-10-05').kcal, 300 + 330);
+  assert.ok(!M.extToFill(a.entry), 'pas de bandeau « à renseigner »');
+  A.applySuggestion(s, '2026-10-05', { slots: ['diner'] }, () => 0.3, ids);
+  assert.ok(s.plan.some(e => e.date === '2026-10-05' && e.slot === 'diner' && e.recipeId), 'le dîner est quand même proposé');
+  assert.throws(() => A.addQuickText(s, { date: '2026-10-06', slot: 'diner', text: ' ' }, ids));
+  assert.ok(!s.plan.some(e => e.date === '2026-10-06' && e.ext), 'rien de créé si le texte est vide');
+  for (const it of [...a.entry.ext.items]) A.removeExtItem(s, a.entry.id, it.id);
+  assert.ok(!s.plan.some(e => e.id === a.entry.id), 'disparaît quand il est vide');
+});

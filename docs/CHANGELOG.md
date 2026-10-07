@@ -1,5 +1,11 @@
 # Journal des versions
 
+## 1.3.1 — 7 octobre 2026
+
+- Bouton + de chaque repas : une case pour écrire directement un dessert, un en-cas ou un plat sans
+  recette (« crème brûlée », « muffin »…), calories estimées. Ces ajouts n'empêchent pas les propositions de menus.
+- Estimation : chocolat, biscuits, barres, bonbons, smoothies, fruits secs, crème brûlée.
+
 ## 1.3.0 — 6 octobre 2026
 
 - Repas pris dehors : il suffit d'écrire le nom des plats (« colin à la crème, riz, yaourt ») ; les

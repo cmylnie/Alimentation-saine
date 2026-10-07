@@ -140,10 +140,12 @@ export function addExtItem(state, id, item, newId = M.defaultId) {
 }
 
 // Renvoie l'identifiant de la photo liée, à effacer du téléphone.
+// Un ajout écrit à la main qui n'a plus rien disparaît.
 export function removeExtItem(state, id, itemId) {
   const ext = extOf(state, id);
   const it = ext.items.find(i => i.id === itemId);
   ext.items = ext.items.filter(i => i.id !== itemId);
+  if (ext.place === 'perso' && !ext.items.length && !ext.photos.length) state.plan = state.plan.filter(e => e.id !== id);
   return it && it.photo ? it.photo : null;
 }
 
@@ -195,4 +197,18 @@ export function setExtItemKcal(state, id, itemId, kcal) {
   delete it.approx;
   if (!state.myDishes) state.myDishes = {};
   state.myDishes[M.norm(it.label)] = { kcal: it.base.kcal, p: it.base.p || 0, emoji: it.emoji };
+}
+
+// Écrit librement (dessert, en-cas, plat fait maison sans recette) : rangé avec les autres ajouts du même repas.
+export function addQuickText(state, { date, slot, text }, newId = M.defaultId) {
+  let e = state.plan.find(x => x.ext && x.ext.place === 'perso' && x.date === date && x.slot === slot);
+  const created = !e;
+  if (!e) e = addExtEntry(state, { date, slot, place: 'perso' }, newId);
+  try {
+    const items = addExtFromText(state, e.id, text, newId);
+    return { entry: e, items };
+  } catch (ex) {
+    if (created) state.plan = state.plan.filter(x => x !== e);
+    throw ex;
+  }
 }

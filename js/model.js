@@ -124,6 +124,7 @@ export const weekEntries = (state, monday) => {
 export const PLACES = {
   cantine: { name: 'Cantine', emoji: '🏢', estimate: 650 },
   resto: { name: 'Restaurant', emoji: '🍴', estimate: 900 },
+  perso: { name: 'Écrit à la main', emoji: '✏️', estimate: 0 },   // dessert, en-cas… écrits librement
 };
 
 export const dish = id => DISHES.find(d => d.id === id) || null;
@@ -135,7 +136,7 @@ export function dishItem(dishId, sizeId = 'normale') {
 }
 
 // Repas photographié mais pas encore renseigné.
-export const extToFill = e => !!(e.ext && !e.ext.items.length);
+export const extToFill = e => !!(e.ext && e.ext.place !== 'perso' && !e.ext.items.length);
 
 export function extNutrition(e) {
   const items = (e.ext && e.ext.items) || [];
@@ -282,7 +283,8 @@ export function suggestWeek(state, monday, { slots = ['petitdej', 'dejeuner', 'g
   weekDays(monday).forEach((date, dayIndex) => {
     const before = added.length;
     for (const slot of SLOTS) {
-      const existing = plan().filter(e => e.date === date && e.slot === slot.id);
+      // un dessert ou un en-cas écrit à la main ne remplit pas la case
+      const existing = plan().filter(e => e.date === date && e.slot === slot.id && !(e.ext && e.ext.place === 'perso'));
       if (existing.length) {
         for (const e of existing) {
           const r = recipe(state, e.recipeId);
